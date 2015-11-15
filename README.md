@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/lummie/dns-dodo.png?branch=master)](https://travis-ci.org/lummie/dns-dodo)
+
 ![](logo.png)
 
 ###DNS-Digital Ocean DO - a DNS sub-domain IP updater for Digital Ocean
