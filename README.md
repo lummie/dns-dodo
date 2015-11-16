@@ -62,3 +62,19 @@ Update the DNS A record for a specific domain and sub-domain to the External IP 
 
 
 ----
+
+
+## Building from Source
+
+1) Install Go
+
+    https://golang.org/doc/install
+
+
+2) Get the latest code from github
+
+    go get github.com/lummie/dns-dodo
+
+3) Build and install dns-dodo in to the $GOPATH/bin directory
+    
+    go install github.com/lummie/dns-dodo
