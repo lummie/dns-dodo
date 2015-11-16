@@ -11,18 +11,29 @@ dns-dodo allows you to use your existing Digital Ocean account for this service.
 In addition dns-dodo allows you to show the public ip, and show the current dns records (all types) associated with a domain on your digital ocean account.
 
 
-### Who / What is Digital Ocean
+## Who / What is Digital Ocean
 Digital Ocean, https://www.digitalocean.com/ provide a Simple Cloud Infrastructure for Developers. You can setup a virtual server in seconds (about 20) and all are SSD based so are responsive.
 They are affordable for the casual developer too...
 
-### Setting up on the Digital Ocean side
-1) Add a A record to an existing domain with the name set to the sub-domain you would like to use and initially set it to your droplets IP address so you can validate that dns-dodo works.
-2) Get your Personal Access Token (PAT) that provides you with the authentication to talk to your Digital Ocean account. **NOTE** If someone gets hold of your PAT they have full api access to create/delete droplets and make your life a misery so please be careful.
+## Getting Started
+
+1. Login to your Digital Ocean account and go to Networking > Domains
+
+2. Add an A record to an existing domain with the name set to the sub-domain you would like to use and the IP address (data) initially set to your droplets IP address. (When this changes, you will have proven your dns-dodo configuration works)
+
+3. Ping the sub.domain.name that you have just created. It might take a while for this to setup, resolve and be pingable.
+
+4. Get your Personal Access Token (PAT) that provides you with the authentication to talk to your Digital Ocean account. 
+**NOTE** If someone gets hold of your PAT they have full api access to create/delete droplets and make your life a misery so please be careful.
 You can get this from the applications page https://cloud.digitalocean.com/settings/applications
 
+5. Create a bash file that calls dns-dodo with the required parameters for the update-dns command.  For more information see below.
+
+6. Call your bash file and re-ping your domain name to confirm it has changed to your public ip address
 
 
-#### Usage
+
+## Usage
 
 Get Help
 
