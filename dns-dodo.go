@@ -144,10 +144,10 @@ func (d *dnsDodo) CheckIPV4(ip string) {
 	// check that the ip address string conforms to an IPV4 address
 	matches, err := regexp.MatchString(`^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$`, ip)
 	if err != nil {
-		exitWithError(fmt.Sprintf("Error trying to query External IP Service [%s] : %s\n", d.ExternalIPServiceUrl, err))
+		exitWithError(fmt.Sprintf("Error matching IP to an IPV4 address [%s]", ip, err))
 	}
 	if matches == false {
-		exitWithError(fmt.Sprintf("The ip address does not appear to be valid: %s\n", ip))
+		exitWithError(fmt.Sprintf("The ip address does not appear to be valid: %s", ip))
 	}
 }
 
@@ -240,23 +240,28 @@ func (d *dnsDodo) UpdateDNSEntry(domainName, subdomain, ipAddress string) {
 		exitWithError(fmt.Sprintf("Expected the record %v to be the record to update", record))
 	}
 
-	// create an update record with the updated details
-	domainER := godo.DomainRecordEditRequest{
-		Type:     record.Type,
-		Name:     record.Name,
-		Priority: record.Priority,
-		Port:     record.Port,
-		Weight:   record.Weight,
-		Data:     ipAddress,
-	}
+	// check the ip has changed
+	if record.Data != ipAddress {
+		// create an update record with the updated details
+		domainER := godo.DomainRecordEditRequest{
+			Type:     record.Type,
+			Name:     record.Name,
+			Priority: record.Priority,
+			Port:     record.Port,
+			Weight:   record.Weight,
+			Data:     ipAddress,
+		}
 
-	// update the specified record id
-	recordId := record.ID
-	_, _, err := d.client.Domains.EditRecord(domainName, recordId, &domainER)
-	if err != nil {
-		exitWithError(err.Error())
+		// update the specified record id
+		recordId := record.ID
+		_, _, err := d.client.Domains.EditRecord(domainName, recordId, &domainER)
+		if err != nil {
+			exitWithError(err.Error())
+		}
+		fmt.Println("Updated.")
+	} else {
+		fmt.Println("IP has not changed.")
 	}
-	fmt.Println("Updated.")
 }
 
 func main() {
