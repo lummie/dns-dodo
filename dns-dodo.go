@@ -268,7 +268,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "dns-dodo"
 	app.Usage = "Dynamic DNS sub-domain updater for Digital Ocean."
-	app.Version = "1.0"
+	app.Version = "1.1"
 
 	// setup the default flags that are optional
 	app.Flags = []cli.Flag{
