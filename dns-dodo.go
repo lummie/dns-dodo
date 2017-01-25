@@ -219,10 +219,14 @@ func (d *dnsDodo) OutputDomainRecords(records []godo.DomainRecord) {
 	}
 }
 
-func (d *dnsDodo) UpdateDNSEntry(domainName, subdomain, ipAddress string) {
+func (d *dnsDodo) UpdateDNSEntry(domainName, subdomain, ipAddress string, printTimestamp bool) {
 	d.CheckIPV4(ipAddress)
 
-	fmt.Printf("About to update %s.%s to %s\n", subdomain, domainName, ipAddress)
+	updateMsgFmt := "About to update %s.%s to %s\n"
+	if printTimestamp {
+		updateMsgFmt = fmt.Sprintf("[%s] %s", time.Now(), updateMsgFmt)
+	}
+	fmt.Printf(updateMsgFmt, subdomain, domainName, ipAddress)
 	records := d.GetDNSEntries(domainName)
 	if len(records) == 0 { // Check we have some entires before filtering
 		exitWithError(fmt.Sprintf("The dodo failed to retrieve any DNS entries for the domain '%s'", domainName))
@@ -375,25 +379,25 @@ func main() {
 				}
 
 				dnsDodo := NewDnsDoDO()
+				dnsDodo.ExternalIPServiceUrl = c.GlobalString("extip")
+				dnsDodo.DOPersonalAccessToken = c.String("pat")
+				dnsDodo.EstablishGoDoClient()
 
-				updateFunc := func() {
-					dnsDodo.ExternalIPServiceUrl = c.GlobalString("extip")
+				updateFunc := func(polling bool) {
 					ip := dnsDodo.getExternalIP()
 					dnsDodo.CheckIPV4(ip) // check the ip is valid before we attempt to connect to Digital Ocean
-					dnsDodo.DOPersonalAccessToken = c.String("pat")
-					dnsDodo.EstablishGoDoClient()
-					dnsDodo.UpdateDNSEntry(c.String("domain"), c.String("sub-domain"), ip)
+					dnsDodo.UpdateDNSEntry(c.String("domain"), c.String("sub-domain"), ip, polling)
 				}
 
 				if !c.IsSet("poll") {
-					updateFunc()
+					updateFunc(false)
 				} else {
 					pollFreq := c.Duration("pollfreq")
 					if pollFreq == 0 {
 						pollFreq = time.Minute
 					}
 					for {
-						updateFunc()
+						updateFunc(true)
 						time.Sleep(pollFreq)
 					}
 				}
