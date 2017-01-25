@@ -13,6 +13,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 )
 
 var externalIPService string = "http://myexternalip.com/raw"
@@ -351,6 +352,14 @@ func main() {
 					Name:  "sub-domain, s",
 					Usage: "Sub-domain of the Domain Name that will be updated with the IP address",
 				},
+				cli.BoolFlag{
+					Name:  "poll, p",
+					Usage: "[Optional] Poll for changes to your external IP to send to Digital Ocean",
+				},
+				cli.DurationFlag{
+					Name:  "pollfreq, f",
+					Usage: "[Optional] Polling frequency in standard duration format e.g. 5m (5 minutes). Only applicable with --poll.",
+				},
 			},
 			Action: func(c *cli.Context) {
 				if !c.IsSet("pat") {
@@ -366,12 +375,28 @@ func main() {
 				}
 
 				dnsDodo := NewDnsDoDO()
-				dnsDodo.ExternalIPServiceUrl = c.GlobalString("extip")
-				ip := dnsDodo.getExternalIP()
-				dnsDodo.CheckIPV4(ip) // check the ip is valid before we attempt to connect to Digital Ocean
-				dnsDodo.DOPersonalAccessToken = c.String("pat")
-				dnsDodo.EstablishGoDoClient()
-				dnsDodo.UpdateDNSEntry(c.String("domain"), c.String("sub-domain"), ip)
+
+				updateFunc := func() {
+					dnsDodo.ExternalIPServiceUrl = c.GlobalString("extip")
+					ip := dnsDodo.getExternalIP()
+					dnsDodo.CheckIPV4(ip) // check the ip is valid before we attempt to connect to Digital Ocean
+					dnsDodo.DOPersonalAccessToken = c.String("pat")
+					dnsDodo.EstablishGoDoClient()
+					dnsDodo.UpdateDNSEntry(c.String("domain"), c.String("sub-domain"), ip)
+				}
+
+				if !c.IsSet("poll") {
+					updateFunc()
+				} else {
+					pollFreq := c.Duration("pollfreq")
+					if pollFreq == 0 {
+						pollFreq = time.Minute
+					}
+					for {
+						updateFunc()
+						time.Sleep(pollFreq)
+					}
+				}
 			},
 		},
 
