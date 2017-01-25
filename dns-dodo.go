@@ -383,10 +383,18 @@ func main() {
 				dnsDodo.DOPersonalAccessToken = c.String("pat")
 				dnsDodo.EstablishGoDoClient()
 
+				var lastIP string
 				updateFunc := func(polling bool) {
 					ip := dnsDodo.getExternalIP()
 					dnsDodo.CheckIPV4(ip) // check the ip is valid before we attempt to connect to Digital Ocean
-					dnsDodo.UpdateDNSEntry(c.String("domain"), c.String("sub-domain"), ip, polling)
+
+					// If IP hasn't changed since we last polled, don't update
+					if ip != lastIP {
+						dnsDodo.UpdateDNSEntry(c.String("domain"), c.String("sub-domain"), ip, polling)
+					} else {
+						fmt.Printf("[%s] IP (%s) hasn't changed since last poll\n", time.Now(), ip)
+					}
+					lastIP = ip
 				}
 
 				if !c.IsSet("poll") {
