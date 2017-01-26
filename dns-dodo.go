@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/signal"
 	"regexp"
 	"strings"
 	"time"
@@ -397,16 +398,29 @@ func main() {
 					lastIP = ip
 				}
 
-				if !c.IsSet("poll") {
-					updateFunc(false)
-				} else {
+				polling := c.IsSet("poll")
+				updateFunc(polling)
+
+				if polling {
 					pollFreq := c.Duration("pollfreq")
 					if pollFreq == 0 {
 						pollFreq = time.Minute
 					}
+
+					sigChan := make(chan os.Signal)
+					signal.Notify(sigChan)
+					updateTicker := time.NewTicker(pollFreq)
+
 					for {
-						updateFunc(true)
-						time.Sleep(pollFreq)
+						select {
+						case <-updateTicker.C:
+							updateFunc(true)
+						case <-sigChan:
+							fmt.Println("")
+							fmt.Println("Going extinct...")
+							updateTicker.Stop()
+							os.Exit(0)
+						}
 					}
 				}
 			},
