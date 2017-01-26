@@ -72,7 +72,15 @@ Update the DNS A record for a specific domain and sub-domain to the External IP 
     dns-dodo update-dns --pat=[your-pat] --domain=[domain-name] --sub-domain=home
 
 
-----
+Poll for changes to your external IP using the `--poll` flag (`-p`).
+
+    dns-dodo update-dns --pat=[your-pat] --domain=[domain-name] --sub-domain=home -p
+
+
+Polling uses a default interval of 1 minute. Use the `--pollfreq` (`-f`) flag to customise the polling frequency.
+The following will poll for updates once per hour.
+
+    dns-dodo update-dns --pat=[your-pat] --domain=[domain-name] --sub-domain=home -p -f=1h
 
 
 ## Building from Source
