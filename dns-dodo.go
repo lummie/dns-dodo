@@ -11,8 +11,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/signal"
 	"regexp"
 	"strings"
+	"time"
 )
 
 var externalIPService string = "http://myexternalip.com/raw"
@@ -218,10 +220,14 @@ func (d *dnsDodo) OutputDomainRecords(records []godo.DomainRecord) {
 	}
 }
 
-func (d *dnsDodo) UpdateDNSEntry(domainName, subdomain, ipAddress string) {
+func (d *dnsDodo) UpdateDNSEntry(domainName, subdomain, ipAddress string, printTimestamp bool) {
 	d.CheckIPV4(ipAddress)
 
-	fmt.Printf("About to update %s.%s to %s\n", subdomain, domainName, ipAddress)
+	updateMsgFmt := "About to update %s.%s to %s\n"
+	if printTimestamp {
+		updateMsgFmt = fmt.Sprintf("[%s] %s", time.Now(), updateMsgFmt)
+	}
+	fmt.Printf(updateMsgFmt, subdomain, domainName, ipAddress)
 	records := d.GetDNSEntries(domainName)
 	if len(records) == 0 { // Check we have some entires before filtering
 		exitWithError(fmt.Sprintf("The dodo failed to retrieve any DNS entries for the domain '%s'", domainName))
@@ -268,7 +274,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "dns-dodo"
 	app.Usage = "Dynamic DNS sub-domain updater for Digital Ocean."
-	app.Version = "1.1"
+	app.Version = "1.2"
 
 	// setup the default flags that are optional
 	app.Flags = []cli.Flag{
@@ -351,6 +357,14 @@ func main() {
 					Name:  "sub-domain, s",
 					Usage: "Sub-domain of the Domain Name that will be updated with the IP address",
 				},
+				cli.BoolFlag{
+					Name:  "poll, p",
+					Usage: "[Optional] Poll for changes to your external IP to send to Digital Ocean",
+				},
+				cli.DurationFlag{
+					Name:  "pollfreq, f",
+					Usage: "[Optional] Polling frequency in standard duration format e.g. 5m (5 minutes). Only applicable with --poll.",
+				},
 			},
 			Action: func(c *cli.Context) {
 				if !c.IsSet("pat") {
@@ -367,11 +381,48 @@ func main() {
 
 				dnsDodo := NewDnsDoDO()
 				dnsDodo.ExternalIPServiceUrl = c.GlobalString("extip")
-				ip := dnsDodo.getExternalIP()
-				dnsDodo.CheckIPV4(ip) // check the ip is valid before we attempt to connect to Digital Ocean
 				dnsDodo.DOPersonalAccessToken = c.String("pat")
 				dnsDodo.EstablishGoDoClient()
-				dnsDodo.UpdateDNSEntry(c.String("domain"), c.String("sub-domain"), ip)
+
+				var lastIP string
+				updateFunc := func(polling bool) {
+					ip := dnsDodo.getExternalIP()
+					dnsDodo.CheckIPV4(ip) // check the ip is valid before we attempt to connect to Digital Ocean
+
+					// If IP hasn't changed since we last polled, don't update
+					if ip != lastIP {
+						dnsDodo.UpdateDNSEntry(c.String("domain"), c.String("sub-domain"), ip, polling)
+					} else {
+						fmt.Printf("[%s] IP (%s) hasn't changed since last poll\n", time.Now(), ip)
+					}
+					lastIP = ip
+				}
+
+				polling := c.IsSet("poll")
+				updateFunc(polling)
+
+				if polling {
+					pollFreq := c.Duration("pollfreq")
+					if pollFreq == 0 {
+						pollFreq = time.Minute
+					}
+
+					sigChan := make(chan os.Signal)
+					signal.Notify(sigChan)
+					updateTicker := time.NewTicker(pollFreq)
+
+					for {
+						select {
+						case <-updateTicker.C:
+							updateFunc(true)
+						case <-sigChan:
+							fmt.Println("")
+							fmt.Println("Going extinct...")
+							updateTicker.Stop()
+							os.Exit(0)
+						}
+					}
+				}
 			},
 		},
 
