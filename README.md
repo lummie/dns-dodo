@@ -82,6 +82,24 @@ The following will poll for updates once per hour.
 
     dns-dodo update-dns --pat=[your-pat] --domain=[domain-name] --sub-domain=home -p -f=1h
 
+The `update-dns` command can also read settings from a configuration file.
+A configuration file can be specified with the `-c` flag.
+
+    dns-dodo update-dns -c=[config-file-path]
+
+The root user searches for `/etc/dns-dodo.conf` when `-c` is not specified. For normal users it's `~/.dns-dodo.conf`.
+
+A sample config file:
+
+    {
+        "externalIpServiceUrl": "https://api.ipify.org",
+        "personalAccessToken": "<personal access token>",
+        "domain": "somedoma.in",
+        "subdomain": "subdom",
+        "pollFreq": "10m"
+    }
+
+----
 
 ## Building from Source
 
