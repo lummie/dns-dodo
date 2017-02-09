@@ -1,0 +1,10 @@
+[Unit]
+Description=The dns-dodo DNS record updater
+Requires=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/dns-dodo update-dns -p
+
+[Install]
+WantedBy=network-online.target
