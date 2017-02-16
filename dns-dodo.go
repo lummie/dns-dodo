@@ -4,26 +4,41 @@ dns-dodo's main purpose is to update a single dns 'A' record to the public IP ad
 package main
 
 import (
+	"encoding/json"
 	"fmt"
-	"github.com/codegangsta/cli"
 	"github.com/digitalocean/godo"
+	"github.com/urfave/cli"
 	"golang.org/x/oauth2"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"os/signal"
+	"os/user"
 	"regexp"
 	"strings"
 	"time"
 )
 
-var externalIPService string = "http://myexternalip.com/raw"
+const (
+	defaultUserConfigFilePath string = "~/.dns-dodo.conf"
+	defaultRootConfigFile     string = "/etc/dns-dodo.conf"
+	defaultExternalIPService  string = "http://myexternalip.com/raw"
+)
 
 type dnsDodo struct {
 	DOPersonalAccessToken string
 	ExternalIPServiceUrl  string
 	OAuthClient           *http.Client
 	client                *godo.Client
+}
+
+// Stores settings for the update-dns command
+type updateSettings struct {
+	ExternalIPServiceURL string   `json:"externalIpServiceUrl"`
+	PersonalAccessToken  string   `json:"personalAccessToken"`
+	Domain               string   `json:"domain"`
+	Subdomain            string   `json:"subdomain"`
+	PollFreq             Duration `json:"pollFreq"`
 }
 
 // displays the supplied message and exits the application with an error level of 1
@@ -111,11 +126,11 @@ func (d *dnsDodo) About() {
 	fmt.Println("")
 }
 
-// Returns the public ip address as returned by the specified ExternalIPServiceUrl
+// Returns the public ip address as returned by the specified ExternalIPServiceURL
 func (d *dnsDodo) getExternalIP() string {
 	// check IP service URL exists
 	if d.ExternalIPServiceUrl == "" {
-		exitWithError("Please supply an External IP Service URL, e.g. " + externalIPService)
+		exitWithError("Please supply an External IP Service URL, e.g. " + defaultExternalIPService)
 	}
 
 	// request external ip address
@@ -146,7 +161,7 @@ func (d *dnsDodo) CheckIPV4(ip string) {
 	// check that the ip address string conforms to an IPV4 address
 	matches, err := regexp.MatchString(`^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$`, ip)
 	if err != nil {
-		exitWithError(fmt.Sprintf("Error matching IP to an IPV4 address [%s]", ip, err))
+		exitWithError(fmt.Sprintf("Error matching IP to an IPV4 address [%s]", ip))
 	}
 	if matches == false {
 		exitWithError(fmt.Sprintf("The ip address does not appear to be valid: %s", ip))
@@ -178,7 +193,7 @@ func (d *dnsDodo) GetDNSEntries(domainName string) []godo.DomainRecord {
 		if pageOfRecords, resp, err := d.client.Domains.Records(domainName, opts); err != nil {
 			exitWithError(err.Error())
 		} else {
-			// add the retrived records to the list
+			// Add the retrieved records to the list
 			list = append(list, pageOfRecords...)
 
 			// if there is not a links or is the last page in the response then we are done
@@ -281,7 +296,7 @@ func main() {
 		cli.StringFlag{
 			Name:  "extip, x",
 			Usage: "[Optional] External IP service URL",
-			Value: externalIPService,
+			Value: defaultExternalIPService,
 		},
 	}
 
@@ -290,7 +305,7 @@ func main() {
 		// show the external IP address from the external IP service
 		{
 			Name:  "show-ip",
-			Usage: fmt.Sprintf("Display the external IP Address using the default provider [%v], otherwise specify via --extip", externalIPService),
+			Usage: fmt.Sprintf("Display the external IP Address using the default provider [%v], otherwise specify via --extip", defaultExternalIPService),
 			Action: func(c *cli.Context) {
 				dnsDodo := NewDnsDoDO()
 				dnsDodo.ExternalIPServiceUrl = c.GlobalString("extip")
@@ -365,23 +380,17 @@ func main() {
 					Name:  "pollfreq, f",
 					Usage: "[Optional] Polling frequency in standard duration format e.g. 5m (5 minutes). Only applicable with --poll.",
 				},
+				cli.StringFlag{
+					Name:  "config, c",
+					Usage: "[Optional] Config file from which to source update settings. Any settings from this file are overriden by flags provided directly. (Default ~/.dns-dodo.conf)",
+				},
 			},
 			Action: func(c *cli.Context) {
-				if !c.IsSet("pat") {
-					exitWithError("Error: A Personal Access Token must be supplied using the --pat flag")
-				}
-
-				if !c.IsSet("domain") {
-					exitWithError("Error: A domain must be specified to update the DNS records for using the --domain flag")
-				}
-
-				if !c.IsSet("sub-domain") {
-					exitWithError("Error: A sub-domain must be specified to update the DNS records for using the --domain flag")
-				}
+				settings := getUpdateSettings(c)
 
 				dnsDodo := NewDnsDoDO()
-				dnsDodo.ExternalIPServiceUrl = c.GlobalString("extip")
-				dnsDodo.DOPersonalAccessToken = c.String("pat")
+				dnsDodo.ExternalIPServiceUrl = settings.ExternalIPServiceURL
+				dnsDodo.DOPersonalAccessToken = settings.PersonalAccessToken
 				dnsDodo.EstablishGoDoClient()
 
 				var lastIP string
@@ -391,18 +400,18 @@ func main() {
 
 					// If IP hasn't changed since we last polled, don't update
 					if ip != lastIP {
-						dnsDodo.UpdateDNSEntry(c.String("domain"), c.String("sub-domain"), ip, polling)
+						dnsDodo.UpdateDNSEntry(settings.Domain, settings.Subdomain, ip, polling)
 					} else {
 						fmt.Printf("[%s] IP (%s) hasn't changed since last poll\n", time.Now(), ip)
 					}
 					lastIP = ip
 				}
 
-				polling := c.IsSet("poll")
+				polling := c.Bool("poll")
 				updateFunc(polling)
 
 				if polling {
-					pollFreq := c.Duration("pollfreq")
+					pollFreq := settings.PollFreq.Duration
 					if pollFreq == 0 {
 						pollFreq = time.Minute
 					}
@@ -452,4 +461,86 @@ func main() {
 
 	// go make those dodos extinct
 	app.Run(os.Args)
+}
+
+// Derives the settings to be used in an update via config file/flags
+func getUpdateSettings(c *cli.Context) *updateSettings {
+	var configFilePath string
+	usingDefaultFile := true
+
+	if usr, _ := user.Current(); usr.Uid == "0" {
+		configFilePath = defaultRootConfigFile
+	} else {
+		configFilePath = defaultUserConfigFilePath
+	}
+
+	if c.IsSet("config") {
+		configFilePath = c.String("config")
+		usingDefaultFile = false
+	}
+
+	// First find any settings defined in a config file.
+	settings := readConfigFile(configFilePath, usingDefaultFile)
+
+	// Override any settings from the config file with flags on the command
+	applyFlags(settings, c)
+
+	// Ensure that all mandatory settings for an update have been provided.
+	checkUpdateSettings(settings)
+
+	return settings
+}
+
+func readConfigFile(configFilePath string, isDefaultFile bool) *updateSettings {
+	if strings.Index(configFilePath, "~") == 0 {
+		configFilePath = strings.Replace(configFilePath, "~", os.Getenv("HOME"), 1)
+	}
+
+	b, err := ioutil.ReadFile(configFilePath)
+
+	if os.IsNotExist(err) && !isDefaultFile {
+		fmt.Println("Config file", configFilePath, "does not exist")
+		os.Exit(1)
+	}
+
+	var settingsFromFile updateSettings
+	json.Unmarshal(b, &settingsFromFile)
+	return &settingsFromFile
+}
+
+// Puts settings from the CLI context into an updateSettings struct.
+func applyFlags(settings *updateSettings, c *cli.Context) {
+	if c.IsSet("pat") {
+		settings.PersonalAccessToken = c.String("pat")
+	}
+
+	if c.IsSet("domain") {
+		settings.Domain = c.String("domain")
+	}
+
+	if c.IsSet("subdomain") {
+		settings.Subdomain = c.String("subdomain")
+	}
+
+	if c.IsSet("pollFreq") {
+		settings.PollFreq = Duration{c.Duration("pollFreq")}
+	}
+
+	if c.GlobalIsSet("extip") {
+		settings.ExternalIPServiceURL = c.GlobalString("extip")
+	}
+}
+
+// Validates that mandatory properties have been provided to do an update.
+func checkUpdateSettings(settings *updateSettings) {
+	if settings.PersonalAccessToken == "" {
+		exitWithError("No Personal Access Token specified")
+	}
+	if settings.Domain == "" {
+		exitWithError("No domain specified")
+	}
+
+	if settings.Subdomain == "" {
+		exitWithError("No subdomain specified")
+	}
 }

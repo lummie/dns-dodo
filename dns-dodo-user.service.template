@@ -1,0 +1,11 @@
+# This is a systemd unit file template
+# It is used by the installUserService.sh script which will insert your GOPATH environment variable
+[Unit]
+Description=The dns-dodo DNS record updater
+Requires=network-online.target
+
+[Service]
+ExecStart={GOPATH}/bin/dns-dodo update-dns -p
+
+[Install]
+WantedBy=network-online.target
