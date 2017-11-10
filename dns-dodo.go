@@ -17,6 +17,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"context"
 )
 
 const (
@@ -186,11 +187,13 @@ func (d *dnsDodo) EstablishGoDoClient() {
 // retrieves all the Domain Records registered with the Digital Ocean account
 // As the api is paged, this method collates all page results into a single list
 func (d *dnsDodo) GetDNSEntries(domainName string) []godo.DomainRecord {
+	ctx := context.Background()
+
 	list := []godo.DomainRecord{} // to hold the domain records
 	opts := &godo.ListOptions{}
 	for {
 		// get a page of domain records
-		if pageOfRecords, resp, err := d.client.Domains.Records(domainName, opts); err != nil {
+		if pageOfRecords, resp, err := d.client.Domains.Records(ctx, domainName, opts); err != nil {
 			exitWithError(err.Error())
 		} else {
 			// Add the retrieved records to the list
@@ -273,9 +276,10 @@ func (d *dnsDodo) UpdateDNSEntry(domainName, subdomain, ipAddress string, printT
 			Data:     ipAddress,
 		}
 
+		ctx := context.Background()
 		// update the specified record id
 		recordId := record.ID
-		_, _, err := d.client.Domains.EditRecord(domainName, recordId, &domainER)
+		_, _, err := d.client.Domains.EditRecord(ctx, domainName, recordId, &domainER)
 		if err != nil {
 			exitWithError(err.Error())
 		}
@@ -289,7 +293,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "dns-dodo"
 	app.Usage = "Dynamic DNS sub-domain updater for Digital Ocean."
-	app.Version = "1.2"
+	app.Version = "1.3"
 
 	// setup the default flags that are optional
 	app.Flags = []cli.Flag{
@@ -518,8 +522,8 @@ func applyFlags(settings *updateSettings, c *cli.Context) {
 		settings.Domain = c.String("domain")
 	}
 
-	if c.IsSet("subdomain") {
-		settings.Subdomain = c.String("subdomain")
+	if c.IsSet("sub-domain") {
+		settings.Subdomain = c.String("sub-domain")
 	}
 
 	if c.IsSet("pollFreq") {
@@ -528,6 +532,11 @@ func applyFlags(settings *updateSettings, c *cli.Context) {
 
 	if c.GlobalIsSet("extip") {
 		settings.ExternalIPServiceURL = c.GlobalString("extip")
+	}
+
+	// if we still don't have an ExternalIPServiceURL then set it to the default
+	if strings.TrimSpace(settings.ExternalIPServiceURL) == "" {
+		settings.ExternalIPServiceURL = defaultExternalIPService
 	}
 }
 
