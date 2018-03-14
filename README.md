@@ -4,7 +4,7 @@
 
 ###DNS-Digital Ocean DO - a DNS sub-domain IP updater for Digital Ocean
 
-dns-dodo's main purpose is to update a single dns 'A' record to the public IP address of the system dns-dojo is run on.
+dns-dodo's main purpose is to update a single dns 'A' record to the public IP address of the system dns-dodo is run on.
 This is very similar to the dynamic dns clients that you can download for no-ip, dyndns, etc. but
 dns-dodo allows you to use your existing Digital Ocean account for this service.
 
