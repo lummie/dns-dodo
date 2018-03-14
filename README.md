@@ -2,13 +2,13 @@
 
 ![](logo.png)
 
-###DNS-Digital Ocean DO - a DNS sub-domain IP updater for Digital Ocean
+### DNS-Digital Ocean DO - a DNS sub-domain IP updater for Digital Ocean
 
 dns-dodo's main purpose is to update a single dns 'A' record to the public IP address of the system dns-dodo is run on.
 This is very similar to the dynamic dns clients that you can download for no-ip, dyndns, etc. but
 dns-dodo allows you to use your existing Digital Ocean account for this service.
 
-In addition dns-dodo allows you to show the public ip, and show the current dns records (all types) associated with a domain on your digital ocean account.
+In addition, dns-dodo allows you to show the public ip, and show the current dns records (all types) associated with a domain on your Digital Ocean account.
 
 
 ## Who / What is Digital Ocean
@@ -17,9 +17,9 @@ They are affordable for the casual developer too...
 
 ## Getting Started
 
-1. Login to your Digital Ocean account and go to Networking > Domains
+1. Login to your Digital Ocean Account and go to Networking > Domains
 
-2. Add an A record to an existing domain with the name set to the sub-domain you would like to use and the IP address (data) initially set to your droplets IP address. (When this changes, you will have proven your dns-dodo configuration works)
+2. Add an A record to an existing domain with the name set to the sub-domain you would like to use and the IP address (data) initially set to your droplet's IP address. (When this changes, you will have proven your dns-dodo configuration works)
 
 3. Ping the sub.domain.name that you have just created. It might take a while for this to setup, resolve and be pingable.
 
@@ -29,7 +29,7 @@ You can get this from the applications page https://cloud.digitalocean.com/setti
 
 5. Create a bash file that calls dns-dodo with the required parameters for the update-dns command.  For more information see below.
 
-6. Call your bash file and re-ping your domain name to confirm it has changed to your public ip address
+6. Call your bash file and re-ping your domain name to confirm it has changed to your public ip address.
 
 
 
@@ -72,13 +72,13 @@ Update the DNS A record for a specific domain and sub-domain to the External IP 
     dns-dodo update-dns --pat=[your-pat] --domain=[domain-name] --sub-domain=home
 
 
-Poll for changes to your external IP using the `--poll` flag (`-p`).
+Poll for changes to your External IP Address using the `--poll` flag (`-p`).
 
     dns-dodo update-dns --pat=[your-pat] --domain=[domain-name] --sub-domain=home -p
 
 
 Polling uses a default interval of 1 minute. Use the `--pollfreq` (`-f`) flag to customise the polling frequency.
-The following will poll for updates once per hour.
+The following will poll for updates once per hour:
 
     dns-dodo update-dns --pat=[your-pat] --domain=[domain-name] --sub-domain=home -p -f=1h
 
